@@ -1,0 +1,78 @@
+<GuiXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sir.insidi.at/or/schema/esoui.xsd">
+    <Controls>
+        <TopLevelControl name="IMP_ImprovedAddonList" resizeToFitDescendents="true" mouseEnabled="true" movable="true" hidden="true">
+            <!-- <Dimensions x="730" y="400" /> -->
+            <Anchor point="LEFT" offsetX="350" offsetY="100" />
+
+            <Controls>
+                <!-- <Backdrop name="$(parent)Background" inherits="ZO_DefaultBackdrop" excludeFromResizeToFitExtents="true" /> -->
+                
+                <Texture name="$(parent)BGLeft" textureFile="EsoUI\Art\Login\addOnManager_BG_left.dds" excludeFromResizeToFitExtents="true">
+                    <Anchor point="TOPLEFT" offsetX="-125" offsetY="-40" />
+                    <Dimensions x="790" y="1220"/>
+                    <Controls>
+                        <Texture name="$(parent)BGRight" textureFile="EsoUI\Art\Login\addOnManager_BG_right.dds">
+                            <Anchor point="TOPLEFT" relativePoint="TOPRIGHT"/>
+                            <Dimensions x="436" y="1220"/>
+                        </Texture>
+                    </Controls>
+                </Texture>
+
+                <Label name="$(parent)Title" font="ZoFontWinH1" modifyTextType="UPPERCASE" text="SI_WINDOW_TITLE_ADDON_MANAGER" excludeFromResizeToFitExtents="true">
+                    <Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT" offsetY="-16" />
+                </Label>
+
+                <Control name="$(parent)GroupFilter" inherits="ZO_MultiselectComboBox" excludeFromResizeToFitExtents="true">
+                    <Dimensions x="190" y="32" />
+                    <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" />
+                </Control>
+
+                <Control name="$(parent)SearchContainer" resizeToFitDescendents="true">
+                    <!-- <Anchor point="TOPLEFT" relativeTo="$(parent)Title" relativePoint="BOTTOMLEFT" offsetY="24" /> -->
+                    <Anchor point="TOPLEFT" />
+                    <Controls>
+                        <Label name="$(parent)Label" font="ZoFontHeader2" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT" text="Search:">
+                            <Anchor point="TOPLEFT" />
+                        </Label>
+                        <Backdrop name="$(parent)Search" tier="HIGH" inherits="ZO_SingleLineEditBackdrop_Keyboard">
+                            <Anchor point="LEFT" relativeTo="$(parent)Label" relativePoint="RIGHT" offsetX="8" />
+                            <Dimensions x="270" />
+                            <Controls>
+                                <EditBox name="$(parent)Box" inherits="ZO_DefaultEditForBackdrop" defaultText="Enter Addon or Author name" />
+                                
+                            </Controls>
+                        </Backdrop>
+                    </Controls>
+                </Control>
+
+                <Control name="$(parent)PrimaryButton" inherits="ZO_DialogButton">
+                    <Anchor point="LEFT" relativeTo="$(parent)SearchContainer" relativePoint="RIGHT" offsetX="36" offsetY="-3" />
+                </Control>
+
+                <Label name="$(parent)TurnAllOff" font="ZoFontHeader2" mouseEnabled="true" text="Turn off">
+                    <Dimensions y="32" />
+                    <Anchor point="LEFT" relativeTo="$(parent)PrimaryButton" relativePoint="RIGHT" offsetX="16" />
+                    
+                    <!-- <OnInitialized>
+                        local AM = GetAddOnManager()
+                        local addonsEnabled = AM:AreAddOnsEnabled()
+                    </OnInitialized> -->
+                    <OnMouseDown>
+                        IMP_ImprovedAddonList_SwitchAddonsState()
+                    </OnMouseDown>
+                    <OnMouseEnter>
+                        self:SetColor(1, 1, 1, 1)
+                    </OnMouseEnter>
+                    <OnMouseExit>
+                        self:SetColor(0.77254909276962, 0.7607843875885, 0.61960786581039, 1)
+                    </OnMouseExit>
+                </Label>
+                
+                <Control name="$(parent)ScrollList">
+                    <Dimensions x="1000" y="900" />
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)SearchContainer" relativePoint="BOTTOMLEFT" offsetY="8" />
+                </Control>
+            </Controls>
+        </TopLevelControl>
+    </Controls>
+</GuiXml>
