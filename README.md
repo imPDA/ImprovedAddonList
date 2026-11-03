@@ -1,0 +1,12 @@
+- [x] buffer to remeber addon state (and everything else, like description)
+    - wrap entire manager? GetAddOnInfo, GetAddOnDependencyInfo
+        - the only problem if addon indicies can change, then it will be impossible to wrap
+- [x] tags
+    - make "library" tag to be added automatically, turned off by default
+- [x] rework tooltip (add version, "by")
+- [x] remove version, add it to tooltip
+- [ ] save tag-addon pairs with tag names instead of indicies
+- [ ] feature to add custom tags
+- [ ] show total number of active addons and libraries
+- [ ] check if any library can be actually turned off on start
+- [ ] should track number of changes internally

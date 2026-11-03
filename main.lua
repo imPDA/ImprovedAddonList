@@ -5,6 +5,55 @@ local Column = LibScrollList.Column
 local Button = LibScrollList.Button
 local combine = LibScrollList.combine
 
+-- ----------------------------------------------------------------------------
+
+local DefaultAddOnManager = GetAddOnManager()
+
+local ENABLED_INDEX = 5
+
+local addonBuffer = {}
+GLOBAL_ADDON_BUFFER = addonBuffer
+
+-- local AddonManagerWrapper = {}
+-- AddonManagerWrapper.__index = AddonManagerWrapper
+
+-- function AddonManagerWrapper:__init()
+--     self.buffer = {}
+
+
+-- end
+
+-- function AddonManagerWrapper:GetAddOnInfo(index)
+--     if not self.buffer[index] then
+--         self.buffer = { DefaultAddOnManager:GetAddOnInfo(index) }
+--     end
+
+--     return self.buffer[index]
+-- end
+
+local DefaultGetAddonInfo = DefaultAddOnManager.GetAddOnInfo
+local DefaultSetAddOnEnabled = DefaultAddOnManager.SetAddOnEnabled
+
+-- SetAddOnEnabled(*luaindex* _addOnIndex_, *bool* _enabled_)
+
+DefaultAddOnManager.GetAddOnInfo = function(self, index)
+    if not addonBuffer[index] then
+        addonBuffer[index] = { DefaultGetAddonInfo(self, index) }
+    end
+
+    return unpack(addonBuffer[index])
+end
+
+DefaultAddOnManager.SetAddOnEnabled = function(self, index, enabled)
+    if addonBuffer[index] then
+        addonBuffer[index][ENABLED_INDEX] = enabled
+    end
+
+    DefaultSetAddOnEnabled(self, index, enabled)
+end
+
+-- ----------------------------------------------------------------------------
+
 local addon = {
     name = 'ImprovedAddonList',
 }
@@ -122,16 +171,19 @@ function addon:CreateTable()
     local Left = Label(combine(defaultCellStyle, alignLeft))
     local Center = Label(combine(defaultCellStyle, alignCenter))
 
-    local Group = Label(combine(defaultCellStyle, alignCenter), function(ctrl, value)
+    local Tags = Label(combine(defaultCellStyle, alignRight), function(ctrl, value)
+        local tmp = {}
         local addonIndex = ctrl:GetParent().dataEntry.data[1]
         local addonName = self.addonList[addonIndex][NAME]
-        local groupId = self.addonGroup[addonName] or 1  -- TODO: GetAddonGroupId
-        local groupName = self.groups[groupId].name
+        for tagIndex, added in pairs(self.addonTags[addonName]) do
+            if added then tmp[#tmp+1] = self.tags[tagIndex] end
+        end
 
-        ctrl:SetText(groupName)
+        ctrl:SetText(#tmp > 0 and table.concat(tmp, ', ') or '-')
     end)
 
     local CenterHeader = Label(combine(combine(defaultCellStyle, alignCenter), defaultHeaderStyle))
+    local RightHeader = Label(combine(combine(defaultCellStyle, alignRight), defaultHeaderStyle))
     -- local QtyCell = Label(combine(defaultCellStyle, alignRight))
 
     local function useFullTitle(ctrl, value)
@@ -352,13 +404,14 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     -- 3. Create list of columns
     local SORTABLE = true
     local columns = {
-        Column('Index',   30,  0, Right,            '#', nil,              SORTABLE),
-        Column('State',   55, 16, ToggleButton, 'State', StateHeader,      SORTABLE),
-        Column('Name',   270,  8, Title,  'Addon Title', TitleHeader,      SORTABLE),
-        Column('Version', 70,  0, Left,       'Version', LeftHeader,   not SORTABLE),
-        Column('Author', 300, 16, Left,        'Author', nil,              SORTABLE),
-        Column('Type',    60,  0, Library,            1, nil,              SORTABLE),
-        Column('Group',  100,  0, Group,        'Group', CenterHeader,     SORTABLE),
+        Column('Index',   30,  0, Right,            '#', nil,             SORTABLE),
+        Column('State',   55, 16, ToggleButton, 'State', StateHeader,     SORTABLE),
+        Column('Name',   270,  8, Title,  'Addon Title', TitleHeader,     SORTABLE),
+        -- Column('Version', 70,  0, Left,       'Version', LeftHeader,   not SORTABLE),
+        Column('Author', 340, 16, Left,        'Author', nil,             SORTABLE),
+        Column('Type',    60,  0, Library,            1, nil,             SORTABLE),
+        -- Column('Group',  100,  0, Group,        'Group', CenterHeader,     SORTABLE),
+        Column('Tags',   175,  0, Tags,          'Tags', RightHeader,     SORTABLE),
     }
     --]]
 
@@ -397,9 +450,22 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
             dependencyNames[#dependencyNames+1] = _formatAddonNameInTooltip(depName, exists, active, version, minVersion)
         end
 
+        addLine(title)
+
+        if author and author ~= '' then
+            addLine('by '..author)
+        end
+
+        local addonVersion = DefaultAddOnManager:GetAddOnVersion(addonIndex)
+        if addonVersion and addonVersion ~= 0 then
+            addLine(('(Version: |cFFFFFF%d|r)'):format(addonVersion))
+        else
+            addLine('(Version: Unknown)')
+        end
+
         -- addLine(name..'|'..title)
         -- addLine(STATE_NAMES[state])
-        -- addLine()
+        addLine()
 
         self.addonList[addonIndex].missing = counterMissing
         self.addonList[addonIndex].old = counterOldVersion
@@ -452,19 +518,33 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         local addonIndex = row.dataEntry.data[1]
         local addonName = self.addonList[addonIndex][NAME]
 
-        for groupId, groupData in pairs(self.groups) do
-            local text = ('Set group \'%s\''):format(groupData.name)
+        for tagIndex = 3, #self.tags do
+            local tagName = self.tags[tagIndex]
+            local text
+            if self.addonTags[addonName][tagIndex] then
+                text = ('Remove tag \'%s\''):format(tagName)
+            else
+                text = ('Add tag \'%s\''):format(tagName)
+            end
+
             AddCustomMenuItem(text, function()
-                self.addonGroup[addonName] = groupId
-                -- self.addonList[addonIndex].groupId = groupId
+                if not self.addonTags[addonName] then
+                    self.addonTags[addonName] = {}
+                end
+                self.addonTags[addonName][tagIndex] = not self.addonTags[addonName][tagIndex]
+
                 self:Update()
             end)
         end
 
-        AddCustomMenuItem('Clear category', function()
-            self.addonGroup[addonName] = nil
-            self:Update()
-        end)
+        if #self.tags - 2 == 0 then
+            AddCustomMenuItem('Add more tags first!')
+        end
+
+        -- AddCustomMenuItem('Clear category', function()
+        --     self.addonGroup[addonName] = nil
+        --     self:Update()
+        -- end)
 
         local dependentAddons = self.dependencies[addonName]
         if dependentAddons and next(dependentAddons) then
@@ -497,7 +577,8 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     myTable:AddDataType(1, columns, 32, postCreateCallback, postSetupCallback)  -- dataType, list of columns, heigth
     myTable:SetMulticolumnSortingEnabled(true)
     myTable:SetDefaultSortingCriteria(
-        6, ZO_SORT_ORDER_UP,
+        5, ZO_SORT_ORDER_UP,
+        2, ZO_SORT_ORDER_UP,
         3, ZO_SORT_ORDER_UP
     )
 
@@ -543,13 +624,11 @@ function addon:InitializeGroupFilter()
     self.groupFilterControl = filterControl
 
     local entriesData = {}
-    for groupId, groupData in ipairs(self.groups) do
-        local priority = groupData.priority
-        local name = groupData.name
 
+    for tagIndex, tagName in ipairs(self.tags) do
         table.insert(entriesData, {
-            text = string.format('(%03d) %s', priority, name),
-            type = groupId,
+            text = tagName,
+            type = tagIndex,
         })
     end
 
@@ -557,20 +636,13 @@ function addon:InitializeGroupFilter()
         -- self.selections.modes = newSelection
         df('%s', table.concat(newSelection, ','))
 
-        local groupsTurnedOn = {}  -- TODO: optimize, do not recreate table
+        local temp = {}
         for i = 1, #newSelection do
-            groupsTurnedOn[newSelection[i]] = true
+            temp[newSelection[i]] = true
         end
 
-        for addonName, addonGroup in pairs(self.addonGroup) do
-            local addonIndex = self.nameToIndex[addonName]
-            if groupsTurnedOn[addonGroup] then
-                ADDON_MANAGER:SetAddOnEnabled(addonIndex, true)
-                self:CheckIfLibrariesShouldBeTurnedOn(addonIndex)
-            else
-                ADDON_MANAGER:SetAddOnEnabled(addonIndex, false)
-                self:CheckIfLibrariesCanBeTurnedOff(addonIndex)
-            end
+        for i = 1, #self.tags do
+            self.activeTags[i] = temp[i] or false  -- TODO: can do nil basically
         end
 
         self:Update()
@@ -578,8 +650,15 @@ function addon:InitializeGroupFilter()
 
     local filter = _initializeFilter(filterControl, entriesData, callback)
 
-    filter:SetNoSelectionText('|cFF0000Select Groups|r')
-    filter:SetMultiSelectionTextFormatter('<<1[$d Group/$d Groupss]>> Selected')
+    filter:SetNoSelectionText('|cFF0000Select Tags|r')
+    filter:SetMultiSelectionTextFormatter('<<1[$d Tag/$d Tags]>> Selected')
+
+    for tagIndex = 1, #self.tags do
+        if self.activeTags[tagIndex] then
+            filter:SelectItemByIndex(tagIndex, true)
+            df('Selecting %d on initialization', tagIndex)
+        end
+    end
 
     -- local function SelectGroup(mode)
     --     for i, item in ipairs(filter.m_sortedItems) do
@@ -624,22 +703,33 @@ function addon:Update()
 
         -- df('Title: %s, serachText: %s, found: %s', title, searchText, tostring(string.find(ltitle, searchText)))
 
+        local thisAddonTags = self.addonTags[name]
+        local shouldShow = false
+        for tagIndex = 1, #self.tags do
+            local tagActive = self.activeTags[tagIndex]
+            if tagActive and thisAddonTags[tagIndex] then
+                shouldShow = true
+                break
+            end
+        end
+
+        if not shouldShow then return end
+
         if searchText then
             if not string.find(addonData.searchText, searchText) then
                 return
             end
         end
 
-        local addonGroupId = self.addonGroup[name] or 1
-
         data[#data+1] = {
             index,
             __getState(enabled, state),
             addonData.clearTitle,
-            addonData.version,
+            -- addonData.version,
             author,  -- TODO: can save to addonData data which will never change to avoid calls
             isLibrary and 1 or 0,
-            self.groups[addonGroupId].priority,
+            -- self.groups[addonGroupId].priority,
+            'здесь будут теги',
         }
 
         --[[
@@ -755,6 +845,12 @@ local DEFAULTS = {
     addonGroup = {
 
     },
+    tags = {
+        'addon',
+        'lib',
+    },
+    addonTags = {},
+    activeTags = {true, true},
 }
 
 function addon:Initialize()
@@ -762,6 +858,10 @@ function addon:Initialize()
     self.chsv = ZO_SavedVars:New('ImprovedAddonsListSV', 1, nil, DEFAULTS)
 
     self.groups = self.awsv.groups
+
+    self.tags = self.chsv.tags
+    self.addonTags = self.chsv.addonTags
+    self.activeTags = self.chsv.activeTags
     self.addonGroup = self.awsv.addonGroup
 
     local addonList = {}
@@ -772,6 +872,13 @@ function addon:Initialize()
     for addonIndex = 1, numAddons do
         local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(addonIndex)
 
+        self.addonTags[name] = {}
+        if isLibrary then
+            self.addonTags[name][2] = true
+        else
+            self.addonTags[name][1] = true
+        end
+
         -- local addonGroupId = self.addonGroup[name] or 1
         local addonData = {
             [NAME] = name,
@@ -781,7 +888,7 @@ function addon:Initialize()
             initial = enabled,
             version = ADDON_MANAGER:GetAddOnVersion(addonIndex),
             -- groupId = addonGroupId,
-        }   
+        }
 
         addonList[addonIndex] = addonData
 
