@@ -1,0 +1,14 @@
+
+{
+    "Lua.diagnostics.globals": [
+        "AddCustomMenuItem",
+        "LibCustomMenu",
+        "ZO_Tooltips_HideTextTooltip",
+        "LibScrollList",
+        "ZO_Tooltips_ShowTextTooltip",
+        "ADDONS_FRAGMENT",
+        "IMP_ImprovedAddonList_DeleteTagDropdown",
+        "LibAddonMenu2",
+        "IMP_ImprovedAddonList",
+    ]
+}
