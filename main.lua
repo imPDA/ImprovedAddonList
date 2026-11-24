@@ -1,3 +1,8 @@
+local DEBUG = HashString(GetDisplayName()) == 1558608849
+local df = DEBUG and df or function(...) end
+
+-- ----------------------------------------------------------------------------
+
 local DefaultAddOnManager = GetAddOnManager()
 
 local ENABLED_INDEX = 5
@@ -102,7 +107,7 @@ local function _formatAddonNameInTooltip(name, exists, active, version, minVersi
         if active then
             if version < minVersion then
                 color = 'FF0000'
-                details = ' (newer version required)'
+                details = (' (version %d or newer required; current: %d)'):format(minVersion, version)
                 -- counterOldVersion = counterOldVersion + 1
             else
                 color = '00FF00'
@@ -134,6 +139,23 @@ local function remove(element, list)
         end
     end
 end
+
+local function add(element, list)
+    for i = 1, #list do
+        if list[i] == element then
+            return
+        end
+    end
+    list[#list+1] = element
+end
+
+local COLUMN_IDX_CHECKBOX = 1
+local COLUMN_IDX_INDEX = 2
+local COLUMN_IDX_STATE = 3
+local COLUMN_IDX_TITLE = 4
+local COLUMN_IDX_AUTHOR = 5
+local COLUMN_IDX_TYPE = 6
+local COLUMN_IDX_TAGS = 7
 
 function addon:CreateTable()
     local Label = LibScrollList.Label
@@ -170,7 +192,7 @@ function addon:CreateTable()
     local Tags = Label(combine(defaultCellStyle, alignRight))
     -- local Tags = Label(combine(defaultCellStyle, alignRight), function(ctrl, value)
     --     local tmp = {}
-    --     local addonIndex = ctrl:GetParent().dataEntry.data[1]
+    --     local addonIndex = ctrl:GetParent().dataEntry.data[COLUMN_IDX_INDEX]
     --     local addonName = self.addonList[addonIndex][NAME]
     --     for tagIndex, added in pairs(self.addonTags[addonName]) do
     --         if added then tmp[#tmp+1] = self.tags[tagIndex] end
@@ -184,7 +206,7 @@ function addon:CreateTable()
     -- local QtyCell = Label(combine(defaultCellStyle, alignRight))
 
     local function useFullTitle(ctrl, value)
-        local addonIndex = ctrl:GetParent().dataEntry.data[1]
+        local addonIndex = ctrl:GetParent().dataEntry.data[COLUMN_IDX_INDEX]
         local fullTitle = self.addonList[addonIndex][TITLE]
 
         ctrl:SetText(fullTitle)
@@ -255,19 +277,19 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     -- end
 
     local function _setState(lbl)
-        -- local index = lbl:GetParent():GetParent():GetParent().dataEntry.data[1]
+        -- local index = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_INDEX]
         -- local enabled, state = select(5, ADDON_MANAGER:GetAddOnInfo(index))
 
         -- local customState = __getState(enabled, state)
 
-        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[2]
+        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_STATE]
 
         lbl:SetText(getStateLabel(customState))
         lbl:SetColor(getStateColor(customState))
     end
 
     local function _getAddonEnabled(lbl)
-        local index = lbl:GetParent():GetParent():GetParent().dataEntry.data[1]  -- TODO: simplify a bit...
+        local index = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_INDEX]  -- TODO: simplify a bit...
         return select(5, ADDON_MANAGER:GetAddOnInfo(index))
     end
 
@@ -275,7 +297,7 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         -- local enabled, state = _getAddonEnabled(lbl)
         -- local customState = __getState(enabled, state)
 
-        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[2]
+        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_STATE]
 
         lbl:SetColor(lighter(getStateColor(customState)))
         -- lbl:SetColor(unpack(COLORS[enabled][true]))
@@ -291,7 +313,7 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         -- local enabled, state = _getAddonEnabled(lbl)
         -- local customState = __getState(enabled, state)
 
-        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[2]
+        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_STATE]
 
         lbl:SetColor(getStateColor(customState))
 
@@ -303,11 +325,11 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     end
 
     local function onMouseUpButtonLabel(lbl)
-        local addonIndex = lbl:GetParent():GetParent():GetParent().dataEntry.data[1]  -- TODO: simplify a bit...
+        local addonIndex = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_INDEX]  -- TODO: simplify a bit...
         -- local enabled, state = select(5, ADDON_MANAGER:GetAddOnInfo(addonIndex))
         -- local customState = __getState(enabled, state)
 
-        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[2]
+        local customState = lbl:GetParent():GetParent():GetParent().dataEntry.data[COLUMN_IDX_STATE]
 
         local nextEnabled
         -- if customState == CUSTOM_STATE_ERROR then
@@ -342,9 +364,10 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
 
         self:Update()
         self:RefreshKeybinds()
+        self:RefreshTagFilterChoices()
     end
 
-    local function onCreateCallback(bttn)  -- TODO: on init callback?
+    local function onToggleButtonCreated(bttn)  -- TODO: on init callback?
         local label = bttn:GetNamedChild('Label')
         if not label then
             label = CreateControl('$(parent)Label', bttn, CT_LABEL)
@@ -363,11 +386,11 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         _setState(label)
     end
 
-    local function toggleCallback(bttn)
-        local index = bttn:GetParent():GetParent().dataEntry.data[1]
+    local function toggleButtonCallback(bttn)
+        -- local index = bttn:GetParent():GetParent().dataEntry.data[COLUMN_IDX_INDEX]
         local label = bttn:GetNamedChild('Label')
 
-        local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(index)
+        -- local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(index)
 
         _setState(label)
 
@@ -388,7 +411,64 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         SetMouseOverBlendMode = {TEX_BLEND_MODE_ADD},
     }
 
-    local ToggleButton = Button(buttonStyle, onCreateCallback, toggleCallback)
+    local ToggleButton = Button(buttonStyle, onToggleButtonCreated, toggleButtonCallback)
+
+    local function selectButtonSetFn(bttn, selected)
+        if selected then
+            bttn:SetState(BSTATE_PRESSED, true)
+        else
+            bttn:SetState(BSTATE_NORMAL, false)
+        end
+    end
+
+    local function selectButtonCallback(bttn)
+        local data = bttn:GetParent():GetParent().dataEntry.data
+        local index = data[COLUMN_IDX_INDEX]
+
+        local newSelected = not self.selectedAddons[index]
+        self.selectedAddons[index] = newSelected
+
+        if newSelected then
+            bttn:SetState(BSTATE_PRESSED, true)
+        else
+            bttn:SetState(BSTATE_NORMAL, false)
+        end
+
+        data[COLUMN_IDX_CHECKBOX] = newSelected
+        bttn:GetParent():GetParent().hightlight:SetHidden(not newSelected)  -- TODO: extract, make function to update based on `data[COLUMN_IDX_CHECKBOX]`
+    end
+
+    local function selectAllButtonCallback(bttn)
+        local selectAll = bttn:GetState() == BSTATE_NORMAL
+
+        self:ClearAddonSelection()
+
+        if selectAll then
+            bttn:SetState(BSTATE_PRESSED, true)
+
+            local data = self.scroll.scroll.data
+            for i = 1, #data do
+                local index = data[i].data[COLUMN_IDX_INDEX]
+                self.selectedAddons[index] = true
+            end
+        end
+
+        self:Update()
+    end
+
+    local selectButtonStyle = {
+        SetDimensions = {32, 32},
+        -- SetTextureCoords = {0.10, 0.90, 0.10, 0.90},
+        SetDrawTier = {DT_MEDIUM},
+        -- SetMouseOverBlendMode = {TEX_BLEND_MODE_ADD},
+        SetNormalTexture = {'EsoUI/Art/Buttons/Gamepad/gp_checkBox_upOver.dds'},
+        SetPressedTexture = {'EsoUI/Art/Buttons/Gamepad/gp_checkBox_downOver.dds'},
+        -- * SetDisabledPressedTexture(*string* _textureFilename_)
+        -- * SetDisabledTexture(*string* _textureFilename_)
+    }
+
+    local SelectButton = Button(selectButtonStyle, selectButtonSetFn, selectButtonCallback)
+    local SelectAllButton = Button(selectButtonStyle, selectButtonSetFn, selectAllButtonCallback)
 
     local LIBRARY_TEXTURE = '/esoui/art/menubar/gamepad/gp_playermenu_icon_lorelibrary.dds'
     local Library = Texture(nil, function(ctrl, value)
@@ -400,19 +480,16 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         end
     end)
 
-    -- 3. Create list of columns
     local SORTABLE = true
     local columns = {
-        Column('Index',   30,  0, Right,            '#', nil,             SORTABLE),
-        Column('State',   55, 16, ToggleButton, 'State', StateHeader,     SORTABLE),
-        Column('Name',   270,  8, Title,  'Addon Title', TitleHeader,     SORTABLE),
-        -- Column('Version', 70,  0, Left,       'Version', LeftHeader,   not SORTABLE),
-        Column('Author', 340, 16, Left,        'Author', nil,             SORTABLE),
-        Column('Type',    60,  0, Library,            1, nil,             SORTABLE),
-        -- Column('Group',  100,  0, Group,        'Group', CenterHeader,     SORTABLE),
-        Column('Tags',   175,  0, Tags,          'Tags', RightHeader,     SORTABLE),
+        [COLUMN_IDX_CHECKBOX]   = Column('Selection', 30,  0, SelectButton,         false, SelectAllButton, not SORTABLE),
+        [COLUMN_IDX_INDEX]      = Column('Index',     30, 16, Right,                 '##',             nil,     SORTABLE),
+        [COLUMN_IDX_STATE]      = Column('State',     55, 16, ToggleButton,       'State',     StateHeader,     SORTABLE),
+        [COLUMN_IDX_TITLE]      = Column('Name',     260,  8, Title,        'Addon Title',     TitleHeader,     SORTABLE),
+        [COLUMN_IDX_AUTHOR]     = Column('Author',   304, 16, Left,              'Author',             nil,     SORTABLE),
+        [COLUMN_IDX_TYPE]       = Column('Type',      60,  0, Library,                  1,             nil,     SORTABLE),
+        [COLUMN_IDX_TAGS]       = Column('Tags',     175,  0, Tags,                'Tags',     RightHeader,     SORTABLE),
     }
-    --]]
 
     local tooltip = {}
     local dependencyNames = {}
@@ -425,7 +502,7 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         ZO_ClearNumericallyIndexedTable(tooltip)
         ZO_ClearNumericallyIndexedTable(dependencyNames)
 
-        local addonIndex = ctrl.dataEntry.data[1]
+        local addonIndex = ctrl.dataEntry.data[COLUMN_IDX_INDEX]
         local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(addonIndex)
 
         local numDeps = ADDON_MANAGER:GetAddOnNumDependencies(addonIndex)
@@ -514,8 +591,11 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     local function showCustomMenu(row)
         ClearMenu()
 
-        local addonIndex = row.dataEntry.data[1]
+        local data = row.dataEntry.data
+        local addonIndex = data[COLUMN_IDX_INDEX]
         local addonName = self.addonList[addonIndex][NAME]
+
+        local selected = data[COLUMN_IDX_CHECKBOX]
 
         for tagName in pairs(self.tags) do
             local addonTags = self.addonTags[addonName]
@@ -523,12 +603,12 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
 
             local text
             if alreadyTagged then
-                text = ('Remove tag \'%s\''):format(tagName)
+                text = ('Remove tag \'%s\'%s'):format(tagName, selected and ' (|c00FF00from all selected|r)' or '')
             else
-                text = ('Add tag \'%s\''):format(tagName)
+                text = ('Add tag \'%s\'%s'):format(tagName, selected and ' (|c00FF00to all selected|r)' or '')
             end
 
-            AddCustomMenuItem(text, function()
+            local function updateThisAddonTags()
                 if alreadyTagged then
                     remove(tagName, addonTags)
                 else
@@ -536,10 +616,32 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
                 end
 
                 self:Update()
-            end)
+                self:RefreshTagFilterChoices()
+            end
+
+            local function updateSelectedAddonsTags()
+                for index, isSelected in pairs(self.selectedAddons) do
+                    if not isSelected then return end
+
+                    local selectedAddonName = self.addonList[index][NAME]
+                    local selectedAddonTags = self.addonTags[selectedAddonName]
+                    if alreadyTagged then
+                        remove(tagName, selectedAddonTags)
+                    else
+                        add(tagName, selectedAddonTags)
+                    end
+                end
+
+                self:Update()
+                self:RefreshTagFilterChoices()
+            end
+
+            AddCustomMenuItem(text, selected and updateSelectedAddonsTags or updateThisAddonTags)
         end
 
-        AddCustomMenuItem(LibCustomMenu.DIVIDER)
+        if next(self.tags) then
+            AddCustomMenuItem(LibCustomMenu.DIVIDER)
+        end
         AddCustomMenuItem('+ Create a new tag', function()
             self:ShowCreateTagDialog()
         end)
@@ -570,9 +672,16 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         rowControl:SetHandler('OnMouseExit', ZO_Tooltips_HideTextTooltip)
 
         rowControl:SetHandler('OnMouseDown', onMouseDown)
+
+        rowControl.hightlight = WINDOW_MANAGER:CreateControlFromVirtual('$(parent)Highlight', rowControl, 'ZO_ThinListHighlight')
+        rowControl.hightlight:SetAlpha(0.3)
 	end
     local postSetupCallback = function(rowControl, dataEntryData, scrollList)
 		rowControl:GetNamedChild('Index'):SetText(rowControl.index)
+
+        -- TODO: extract, make funtion to update based on `data[COLUMN_IDX_CHECKBOX]`
+        local selected = rowControl.dataEntry.data[COLUMN_IDX_CHECKBOX]
+        rowControl.hightlight:SetHidden(not selected)
 	end
 
     local WITH_HEADERS = true
@@ -581,9 +690,9 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     myTable:AddDataType(1, columns, 32, postCreateCallback, postSetupCallback)  -- dataType, list of columns, heigth
     myTable:SetMulticolumnSortingEnabled(true)
     myTable:SetDefaultSortingCriteria(
-        5, ZO_SORT_ORDER_UP,
-        2, ZO_SORT_ORDER_UP,
-        3, ZO_SORT_ORDER_UP
+        6, ZO_SORT_ORDER_UP,
+        3, ZO_SORT_ORDER_UP,
+        4, ZO_SORT_ORDER_UP
     )
 
     local REPLACE = true
@@ -594,8 +703,17 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     self.scroll = myTable
 end
 
+function addon:ClearAddonSelection()
+    local bttn = self.scroll.headerControls[1]:GetNamedChild('Button')
+    bttn:SetState(BSTATE_NORMAL, false)
+
+    for i in pairs(self.selectedAddons) do
+        self.selectedAddons[i] = nil
+    end
+end
+
 function addon:InitializeTagFilter()
-    local filterControl = self.tlc:GetNamedChild('GroupFilter')
+    local filterControl = self.tlc:GetNamedChild('HeadGroupFilter')
 
     local comboBox = ZO_ComboBox_ObjectFromContainer(filterControl)
     -- comboBox:SetSortsItems(false)
@@ -610,7 +728,7 @@ function addon:InitializeTagFilter()
 
             for i = 1, #self.m_selectedItemData do
                 local entry = self.m_selectedItemData[i]
-                tmp[i] = entry.name
+                tmp[i] = entry.tag
             end
 
             self:SetSelectedItemText(table.concat(tmp, ', '))
@@ -628,8 +746,10 @@ function addon:InitializeTagFilter()
         end
 
         for tagName in pairs(self.tags) do
-            self.selectedTags[tagName] = temp[tagName]
+            self.selectedTags[tagName] = temp[tagName] or false
         end
+
+        self:ClearAddonSelection()
 
         self:Update()
     end
@@ -638,6 +758,17 @@ function addon:InitializeTagFilter()
 
     self:RefreshTagFilterChoices()
 end
+
+local ERROR_STATE = {
+    [ADDON_STATE_DEPENDENCIES_DISABLED] = true,
+    [ADDON_STATE_ERROR_STATE_UNABLE_TO_LOAD] = true,
+    [ADDON_STATE_VERSION_MISMATCH] = true,
+
+    -- * ADDON_STATE_DISABLED
+    -- * ADDON_STATE_ENABLED
+    -- * ADDON_STATE_NO_STATE
+    -- * ADDON_STATE_TOC_LOADED
+}
 
 local IGNORE_CALLBACK = true
 function addon:RefreshTagFilterChoices()
@@ -649,14 +780,49 @@ function addon:RefreshTagFilterChoices()
         local newFilters = {}
 
         for _, itemData in ipairs(comboBox_.m_selectedItemData) do
-            table.insert(newFilters, itemData.name)
+            table.insert(newFilters, itemData.tag)
         end
 
         self.tagFilterCallback(newFilters)
     end
 
+    -- TODO: clear instead
+    local tmp = {}
+    for tag in pairs(self.tags) do
+        tmp[tag] = {0, 0, 0}
+    end
+
+    for addonName, addonIndex in pairs(self.nameToIndex) do
+        local tags = self.addonTags[addonName]
+
+        local enabled, state = select(5, ADDON_MANAGER:GetAddOnInfo(addonIndex))
+        for i = 1, #tags do
+            local tag = tags[i]
+            if tmp[tag] then
+                tmp[tag][1] = tmp[tag][1] + 1
+
+                if enabled then  -- TODO: extract addon status resolution
+                    if state == ADDON_STATE_ENABLED then  -- TODO: is it enough to see if addon works?
+                        tmp[tag][2] = tmp[tag][2] + 1
+                    else
+                        tmp[tag][3] = tmp[tag][3] + 1
+                    end
+                end
+            end
+        end
+    end
+
     for tagName in pairs(self.tags) do
-        local item = comboBox:CreateItemEntry(tagName, onFilterChanged)
+        local itemName
+        if tmp[tagName][3] > 0 then
+            itemName = ('%s (%d/%d, |cFFA500%d%s|r)'):format(tagName, tmp[tagName][2], tmp[tagName][1], tmp[tagName][3], zo_iconFormatInheritColor('/esoui/art/miscellaneous/eso_icon_warning.dds', 24, 24))
+        else
+            itemName = ('%s (%d/%d)'):format(tagName, tmp[tagName][2], tmp[tagName][1])
+        end
+
+        local item = comboBox:CreateItemEntry(itemName, onFilterChanged)
+        item.tag = tagName
+
         comboBox:AddItem(item)
 
         if self.selectedTags[tagName] then
@@ -673,6 +839,17 @@ function addon:RefreshTagFilterChoices()
     -- end
 end
 
+function addon:InitializeShowLibraryCheckbox()
+    local checkbox = self.tlc:GetNamedChild('HeadShowLibrariesButton')
+
+    ZO_CheckButton_SetLabelText(checkbox, zo_iconFormat('/esoui/art/menubar/gamepad/gp_playermenu_icon_lorelibrary.dds', 24, 24)..' Show Libraries')
+    ZO_CheckButton_SetCheckState(checkbox, self.chsv.showLibraries)
+    ZO_CheckButton_SetToggleFunction(checkbox, function(ctrl, checked)
+        self.chsv.showLibraries = checked
+        self:Update()
+    end)
+end
+
 function addon:InitializeSearch()
     local function OnSearchTextChanged(editBox)
         local newText = string.lower(editBox:GetText())
@@ -681,6 +858,9 @@ function addon:InitializeSearch()
 
         self.filters.searchText = newText
         -- self.dirty = true
+
+        self:ClearAddonSelection()
+
         self:Update()  -- TODO: throttling?
     end
 
@@ -688,6 +868,12 @@ function addon:InitializeSearch()
     self.searchBox:SetHandler('OnTextChanged',  OnSearchTextChanged)
 
     self.searchBox:SetHandler('OnEffectivelyShown', function(self_) self_:TakeFocus() end)
+end
+
+local function containsAny(iterable, hashMap)
+    for i = 1, #iterable do
+        if hashMap[iterable[i]] ~= nil then return true end
+    end
 end
 
 function addon:Update()
@@ -703,6 +889,8 @@ function addon:Update()
         end
     end
 
+    local visibleTags = {}
+    local showLibraries = self.chsv.showLibraries
     local function addAddon(index)
         local addonData = self.addonList[index]
         local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(index)
@@ -712,19 +900,35 @@ function addon:Update()
         -- df('Title: %s, serachText: %s, found: %s', title, searchText, tostring(string.find(ltitle, searchText)))
 
         local thisAddonTags = self.addonTags[name]
-        local addonTagsText = #thisAddonTags == 0 and '-' or table.concat(thisAddonTags, ', ')
+
+        ZO_ClearTable(visibleTags)
+        for i = 1, #thisAddonTags do
+            local tag = thisAddonTags[i]
+            if self.tags[tag] ~= nil then
+                visibleTags[#visibleTags+1] = tag
+            end
+        end
+        table.sort(visibleTags)
+        local addonTagsText = #visibleTags == 0 and '-' or table.concat(visibleTags, ', ')
 
         local shouldShow = false
         if atLeastOneTagSelected then
-            for i = 1, #thisAddonTags do
-                local tag = thisAddonTags[i]
-                if self.selectedTags[tag] then
+            for i = 1, #visibleTags do
+                local tag = visibleTags[i]
+                if self.tags[tag] ~= nil and self.selectedTags[tag] then
                     shouldShow = true
                     break
                 end
             end
         else
-            shouldShow = #thisAddonTags == 0
+            shouldShow = #visibleTags == 0
+        end
+
+        -- TODO: remove early exit if I ever decide to return to `grayedOut` rework
+        if not shouldShow then return end
+
+        if isLibrary and not showLibraries then
+            return
         end
 
         local grayedOut = false
@@ -751,7 +955,10 @@ function addon:Update()
             finalTags = addonTagsText
         end
 
+        local selected = self.selectedAddons[index]
+
         data[#data+1] = {
+            selected,
             index,
             __getState(enabled, state),
             finalTitle,
@@ -875,6 +1082,7 @@ local DEFAULTS_CHARACTER_SPECIFIC = {
     selectedTags = {
         ['new'] = true,
     },
+    showLibraries = false,
 }
 
 function addon:Initialize()
@@ -897,7 +1105,7 @@ function addon:Initialize()
         local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(addonIndex)
 
         if not self.addonTags[name] then
-            self.addonTags[name] = {isLibrary and 'lib' or 'new'}
+            self.addonTags[name] = {'new'}
         end
 
         -- local addonGroupId = self.addonGroup[name] or 1
@@ -944,7 +1152,9 @@ function addon:Initialize()
     self.listName = 'ScrollList'
     self:CreateTable()
 
-    self.searchBox = self.tlc:GetNamedChild('SearchContainerSearchBox')
+    self.selectedAddons = {}
+
+    self.searchBox = self.tlc:GetNamedChild('HeadSearchContainerSearchBox')
     self.filters = {}
     self:InitializeSearch()
 
@@ -952,6 +1162,8 @@ function addon:Initialize()
     self:SetButtonState(not self:GetNotWhitelistAddonsActive())
 
     self:InitializeTagFilter()
+
+    self:InitializeShowLibraryCheckbox()
 
     self:ReplaceMainMenuEntry()
 
@@ -1115,6 +1327,8 @@ function addon:RegisterCreateTagDialog()
 
                     self:RefreshTagFilterChoices()
                     self:RefreshDeleteTagChoices()
+
+                    self:Update()
                 end,
             },
             [2] = { text = SI_DIALOG_CANCEL },
@@ -1150,12 +1364,13 @@ function addon:CreateSettings()
         },
         {
             type    = 'button',
-            name    = 'Delete tag',
+            name    = 'Delete tag',  -- TODO: confirmation dialogue
             -- width   = 'half',
             func    = function()
                 if not tagToDelete then return end
 
                 self.tags[tagToDelete] = nil
+                self.selectedTags[tagToDelete] = nil
                 tagToDelete = nil
 
                 self:RefreshDeleteTagChoices()
@@ -1188,7 +1403,7 @@ function addon:GetEditableChoices()
     local choices = {}
 
     for tagName in pairs(self.tags) do
-        if tagName ~= 'new' and tagName ~= 'lib' then
+        if tagName ~= 'new' then
             choices[#choices+1] = tagName
         end
     end

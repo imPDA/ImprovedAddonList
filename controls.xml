@@ -47,38 +47,45 @@
                     <Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT" offsetY="-16" />
                 </Label>
 
-                <Control name="$(parent)GroupFilter" inherits="IMP_MultiselectComboBox2" excludeFromResizeToFitExtents="true">
-                    <Dimensions x="250" y="32" />
-                    <Anchor point="TOPRIGHT" offsetX="-24" />
-
-                    <!-- <Controls>
-                        <Label name="$(parent)Label" font="ZoFontHeader2" wrapMode="ELLIPSIS" text="Tags: " verticalAlignment="CENTER">
-                            <Anchor point="RIGHT" relativePoint="LEFT" />
-                            <Dimensions y="32" />
-                        </Label>
-                    </Controls> -->
-                </Control>
-
-                <Control name="$(parent)SearchContainer" resizeToFitDescendents="true">
-                    <!-- <Anchor point="TOPLEFT" relativeTo="$(parent)Title" relativePoint="BOTTOMLEFT" offsetY="24" /> -->
-                    <Anchor point="TOPLEFT" offsetY="4" />
+                <Control name="$(parent)Head" resizeToFitDescendents="true">
+                    <Anchor point="TOPLEFT" />
+                    <Anchor point="TOPRIGHT" />
                     <Controls>
-                        <Label name="$(parent)Label" font="ZoFontHeader2" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT" text="Search:">
-                            <Anchor point="TOPLEFT" />
-                        </Label>
-                        <Backdrop name="$(parent)Search" tier="HIGH" inherits="ZO_SingleLineEditBackdrop_Keyboard">
-                            <Anchor point="LEFT" relativeTo="$(parent)Label" relativePoint="RIGHT" offsetX="8" />
-                            <Dimensions x="270" />
-                            <Controls>
-                                <EditBox name="$(parent)Box" inherits="ZO_DefaultEditForBackdrop" defaultText="Enter Addon or Author name" />
+                        <Control name="$(parent)GroupFilter" inherits="IMP_MultiselectComboBox2" excludeFromResizeToFitExtents="true">
+                            <Dimensions x="250" y="32" />
+                            <Anchor point="TOPRIGHT" offsetX="-24" />
+                        </Control>
 
+                        <Control name="$(parent)SearchContainer" resizeToFitDescendents="true">
+                            <Anchor point="TOPLEFT" offsetY="4" />
+                            <Controls>
+                                <Label name="$(parent)Label" font="ZoFontHeader2" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL" horizontalAlignment="LEFT" text="Search:">
+                                    <Anchor point="TOPLEFT" />
+                                </Label>
+                                <Backdrop name="$(parent)Search" tier="HIGH" inherits="ZO_SingleLineEditBackdrop_Keyboard">
+                                    <Anchor point="LEFT" relativeTo="$(parent)Label" relativePoint="RIGHT" offsetX="8" />
+                                    <Dimensions x="270" />
+                                    <Controls>
+                                        <EditBox name="$(parent)Box" inherits="ZO_DefaultEditForBackdrop" defaultText="Enter Addon or Author name" />
+                                    </Controls>
+                                </Backdrop>
                             </Controls>
-                        </Backdrop>
+                        </Control>
+
+                        <Control name="$(parent)ShowLibraries" resizeToFitDescendents="true">
+                            <Anchor point="TOPLEFT" relativeTo="$(parent)SearchContainer" relativePoint="BOTTOMLEFT" />
+                            <Controls>
+                                <Button name="$(parent)Button" inherits="ZO_GamepadCheckButton">
+                                    <Anchor point="LEFT" />
+                                    <Dimensions x="36" y="36" />
+                                    <TextureCoords left="0.05" right="0.95" top="0.05" bottom="0.95" />
+                                </Button>
+                            </Controls>
+                        </Control>
                     </Controls>
                 </Control>
 
                 <Control name="$(parent)PrimaryButton" inherits="ZO_DialogButton">
-                    <!-- <Anchor point="LEFT" relativeTo="$(parent)SearchContainer" relativePoint="RIGHT" offsetX="36" offsetY="-3" /> -->
                     <Anchor point="TOPRIGHT" relativeTo="$(parent)" relativePoint="BOTTOMRIGHT" offsetY="8" />
                 </Control>
 
@@ -102,7 +109,7 @@
                 </Label>
 
                 <Control name="$(parent)ScrollList">
-                    <Anchor point="TOPLEFT" relativeTo="$(parent)SearchContainer" relativePoint="BOTTOMLEFT" offsetY="8" />
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)Head" relativePoint="BOTTOMLEFT" offsetY="8" />
                     <Anchor point="BOTTOMRIGHT" />
                 </Control>
             </Controls>

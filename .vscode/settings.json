@@ -8,6 +8,9 @@
         "ZO_Tooltips_ShowTextTooltip",
         "ADDONS_FRAGMENT",
         "IMP_ImprovedAddonList_DeleteTagDropdown",
+        "ZO_CheckButton_SetLabelText",
+        "ZO_CheckButton_SetCheckState",
+        "ZO_CheckButton_SetToggleFunction",
         "LibAddonMenu2",
         "IMP_ImprovedAddonList",
     ]
