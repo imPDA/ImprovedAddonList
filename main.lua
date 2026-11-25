@@ -712,8 +712,6 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
     local HEADER_TYPE = 4
 
     local function postCreateHeaderCallback(ctrl)
-        Zgoo:Main(nil, nil, ctrl)
-
         ctrl:SetFont('ZoFontWinH2')
         ctrl:SetVerticalAlignment(TEXT_ALIGN_CENTER)
 
