@@ -449,7 +449,9 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
             local data = self.scroll.scroll.data
             for i = 1, #data do
                 local index = data[i].data[COLUMN_IDX_INDEX]
-                self.selectedAddons[index] = true
+                if index then  -- TODO: maybe there is a better way to do so? It is a side effect of multi type table
+                    self.selectedAddons[index] = true
+                end
             end
         end
 
@@ -536,7 +538,7 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         if addonVersion and addonVersion ~= 0 then
             addLine(('(Version: |cFFFFFF%d|r)'):format(addonVersion))
         else
-            addLine('(Version: Unknown)')
+            addLine('(Version: |cFFFFFFUnknown|r)')
         end
 
         -- addLine(name..'|'..title)
@@ -646,6 +648,13 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
             self:ShowCreateTagDialog()
         end)
 
+        if select(5, ADDON_MANAGER:GetAddOnInfo(addonIndex)) then
+            AddCustomMenuItem(LibCustomMenu.DIVIDER)
+            AddCustomMenuItem('Select all active addons', function()
+                self:SelectActive()
+            end)
+        end
+
         local dependentAddons = self.dependencies[addonName]
         if dependentAddons and next(dependentAddons) then
             AddCustomMenuItem('Turn off with dependants', function()
@@ -677,7 +686,9 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         rowControl.hightlight:SetAlpha(0.3)
 	end
     local postSetupCallback = function(rowControl, dataEntryData, scrollList)
-		rowControl:GetNamedChild('Index'):SetText(rowControl.index)
+		-- rowControl:GetNamedChild('Index'):SetText(rowControl.index)
+		rowControl:GetNamedChild('Index'):SetText(rowControl.index - 1 - math.floor(rowControl.dataEntry.typeId / 2))
+        -- TODO: brittle, redo with proper indicies
 
         -- TODO: extract, make funtion to update based on `data[COLUMN_IDX_CHECKBOX]`
         local selected = rowControl.dataEntry.data[COLUMN_IDX_CHECKBOX]
@@ -695,6 +706,53 @@ Tip: If dependencies are turned |cB3B3B3OFF|r, click on the button to turn them 
         4, ZO_SORT_ORDER_UP
     )
 
+    myTable:AddDataType(2, columns, 32, postCreateCallback, postSetupCallback)
+    myTable:AddDataType(3, columns, 32, postCreateCallback, postSetupCallback)
+
+    local HEADER_TYPE = 4
+
+    local function postCreateHeaderCallback(ctrl)
+        Zgoo:Main(nil, nil, ctrl)
+
+        ctrl:SetFont('ZoFontWinH2')
+        ctrl:SetVerticalAlignment(TEXT_ALIGN_CENTER)
+
+        ctrl:SetHandler('OnMouseDown', function()
+            local data = ctrl.dataEntry.data
+            self.rolledUpSections[data.typeId] = not self.rolledUpSections[data.typeId]
+            self:Update()
+        end)
+    end
+
+    local function postSetupHeaderCallback(ctrl)
+        local data = ctrl.dataEntry.data
+        -- ctrl:SetText('Header '..data.typeId)
+        ctrl:SetText(data.text)
+    end
+
+    myTable:AddDataType(HEADER_TYPE, {}, 32, postCreateHeaderCallback, postSetupHeaderCallback)
+
+    myTable:SetSortComparator(function(left, right)
+        local lGroup = (left.typeId == HEADER_TYPE) and left.data.typeId or left.typeId
+        local rGroup = (right.typeId == HEADER_TYPE) and right.data.typeId or right.typeId
+
+        if lGroup ~= rGroup then
+            return lGroup < rGroup
+        end
+
+        local lIsHeader = left.typeId == HEADER_TYPE
+        local rIsHeader = right.typeId == HEADER_TYPE
+        if lIsHeader ~= rIsHeader then
+            return lIsHeader
+        end
+
+        if lIsHeader then
+            return false
+        end
+
+        return myTable:DefaultSortCompare(left, right)
+    end)
+
     local REPLACE = true
     local scrollControl = myTable:Create(self.listName, self.tlc, REPLACE)
     -- scrollControl:SetDimensions(600, 600)  -- now you can modify it as you want
@@ -710,6 +768,19 @@ function addon:ClearAddonSelection()
     for i in pairs(self.selectedAddons) do
         self.selectedAddons[i] = nil
     end
+end
+
+function addon:SelectActive()
+    local data = ZO_ScrollList_GetDataList(self.scroll.scroll)
+
+    for i = 1, #data do
+        local addonIndex = data[i].data[COLUMN_IDX_INDEX]
+        if select(5, ADDON_MANAGER:GetAddOnInfo(addonIndex)) then
+            self.selectedAddons[addonIndex] = true
+        end
+    end
+
+    self:Update()
 end
 
 function addon:InitializeTagFilter()
@@ -788,6 +859,7 @@ function addon:RefreshTagFilterChoices()
 
     -- TODO: clear instead
     local tmp = {}
+    self.tagStats = tmp
     for tag in pairs(self.tags) do
         tmp[tag] = {0, 0, 0}
     end
@@ -812,6 +884,32 @@ function addon:RefreshTagFilterChoices()
         end
     end
 
+    local function ShowItemTooltip(ctrl)
+        local offsetX = ctrl:GetParent():GetLeft() - ctrl:GetLeft() - 5
+        InitializeTooltip(InformationTooltip, ctrl, RIGHT, offsetX, 0, LEFT)
+
+        local menuIndex = ctrl.menuIndex
+        local tagName = self.tagFilter.m_sortedItems[menuIndex].tag
+
+        local stats = self.tagStats[tagName]
+        local text
+        if stats[3] > 0 then
+            text = ('|cFFFFFF%d|r enabled out of |cFFFFFF%d|r total, |cFFFFFF%d|r error(s)'):format(stats[2], stats[1], stats[3])
+        else
+            text = ('|cFFFFFF%d|r enabled out of |cFFFFFF%d|r total'):format(stats[2], stats[1])
+        end
+
+        -- InformationTooltip:AddLine(text)
+        InformationTooltip:AddLine(text, '', ZO_TOOLTIP_DEFAULT_COLOR:UnpackRGB())
+
+        -- ZO_Tooltips_ShowTextTooltip(ctrl, LEFT, text)
+    end
+
+    local function HideItemTooltip()
+        -- ZO_Tooltips_HideTextTooltip()
+        ClearTooltip(InformationTooltip)
+    end
+
     for tagName in pairs(self.tags) do
         local itemName
         if tmp[tagName][3] > 0 then
@@ -822,6 +920,9 @@ function addon:RefreshTagFilterChoices()
 
         local item = comboBox:CreateItemEntry(itemName, onFilterChanged)
         item.tag = tagName
+
+        comboBox:SetItemOnEnter(item, ShowItemTooltip)
+        comboBox:SetItemOnExit(item, HideItemTooltip)
 
         comboBox:AddItem(item)
 
@@ -877,7 +978,8 @@ local function containsAny(iterable, hashMap)
 end
 
 function addon:Update()
-    local data = {}
+    -- local data = {}
+    local data = self.scroll:GetDataList()
 
     local searchText = self.filters.searchText
 
@@ -891,9 +993,21 @@ function addon:Update()
 
     local visibleTags = {}
     local showLibraries = self.chsv.showLibraries
+    local header1, header2, header3
     local function addAddon(index)
         local addonData = self.addonList[index]
         local name, title, author, description, enabled, state, isOutOfDate, isLibrary = ADDON_MANAGER:GetAddOnInfo(index)
+
+        local typeId
+        if isLibrary then
+            typeId = 3
+            header3 = true
+        else
+            typeId = 1
+            header1 = true
+        end
+
+        if self.rolledUpSections[typeId] then return end
 
         -- local ltitle = string.lower(title)
 
@@ -957,15 +1071,18 @@ function addon:Update()
 
         local selected = self.selectedAddons[index]
 
-        data[#data+1] = {
-            selected,
-            index,
-            __getState(enabled, state),
-            finalTitle,
-            finalAuthor,  -- TODO: can save to addonData data which will never change to avoid calls
-            isLibrary and 1 or 0,
-            finalTags,
-        }
+        data[#data+1] = ZO_ScrollList_CreateDataEntry(
+            typeId,
+            {
+                selected,
+                index,
+                __getState(enabled, state),
+                finalTitle,
+                finalAuthor,  -- TODO: can save to addonData data which will never change to avoid calls
+                isLibrary and 1 or 0,
+                finalTags,
+            }
+        )
 
         --[[
         data[#data+1] = {
@@ -976,14 +1093,61 @@ function addon:Update()
             addonData[IS_LIBRARY] and 1 or 0,
             addonData[NUM_DEPENDENCIES],
         }
-        ]]
+        --]]
     end
+
+    self.scroll:Clear()
 
     for a = 1, #self.addonList do
         addAddon(a)
     end
 
-    self.scroll:Update(1, data)
+    local function _addRollUpDownIcon(section, text)
+        local icon
+        if self.rolledUpSections[section] then
+            icon = zo_iconFormat('/esoui/art/buttons/gamepad/gp_plus.dds', 16, 16)
+        else
+            icon = zo_iconFormat('/esoui/art/buttons/gamepad/gp_minus.dds', 16, 16)
+        end
+
+        return icon..' '..text
+    end
+
+    local text
+    if self.selectedPreset then
+        text = ('Add-ons in the %s preset'):format(self.selectedPreset)
+    else
+        text = 'Add-ons'
+    end
+
+    text = _addRollUpDownIcon(1, text)
+
+    data[#data+1] = ZO_ScrollList_CreateDataEntry(4, {isHeader = true, typeId = 1, text = text})  -- TODO: isHeader not used atm
+
+    if header2 then
+        if self.selectedPreset then
+            text = ('Add-ons not in preset'):format(self.selectedPreset)
+        end
+
+        text = _addRollUpDownIcon(2, text)
+
+        data[#data+1] = ZO_ScrollList_CreateDataEntry(4, {isHeader = true, typeId = 2, text = text})
+    end
+
+    if header3 then
+        -- TODO: isHeader not used atm
+        -- TODO: create header once
+        -- TODO: make special Table API to create headers like this
+
+        text = 'Libraries'
+        text = _addRollUpDownIcon(3, text)
+
+        data[#data+1] = ZO_ScrollList_CreateDataEntry(4, {isHeader = true, typeId = 3, text = text})
+    end
+
+    -- self.scroll:Update(1, data)
+
+    self.scroll:Commit()
 end
 
 function addon:CheckIfDependencyInUse(dependencyName)
@@ -1076,6 +1240,7 @@ local DEFAULTS_ACCOUNT_WIDE = {
         ['new'] = true,
     },
     addonTags = {},
+    presets = {},
 }
 
 local DEFAULTS_CHARACTER_SPECIFIC = {
@@ -1163,9 +1328,13 @@ function addon:Initialize()
 
     self:InitializeTagFilter()
 
-    self:InitializeShowLibraryCheckbox()
+    -- self:InitializeShowLibraryCheckbox()
 
     self:ReplaceMainMenuEntry()
+
+    self.rolledUpSections = {
+        [3] = true,
+    }
 
     self:Update()
 

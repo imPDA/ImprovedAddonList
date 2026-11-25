@@ -72,7 +72,7 @@
                             </Controls>
                         </Control>
 
-                        <Control name="$(parent)ShowLibraries" resizeToFitDescendents="true">
+                        <!-- <Control name="$(parent)ShowLibraries" resizeToFitDescendents="true">
                             <Anchor point="TOPLEFT" relativeTo="$(parent)SearchContainer" relativePoint="BOTTOMLEFT" />
                             <Controls>
                                 <Button name="$(parent)Button" inherits="ZO_GamepadCheckButton">
@@ -81,7 +81,7 @@
                                     <TextureCoords left="0.05" right="0.95" top="0.05" bottom="0.95" />
                                 </Button>
                             </Controls>
-                        </Control>
+                        </Control> -->
                     </Controls>
                 </Control>
 
